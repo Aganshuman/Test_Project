@@ -1,0 +1,163 @@
+<Project DefaultTargets="DesktopBuild"  xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <Import Project="$(MSBuildExtensionsPath)\Microsoft\VisualStudio\TeamBuild\Microsoft.TeamFoundation.Build.targets" />
+  <Import Project="C:\Program Files (x86)\MSBuild\MSBuildCommunityTasks\MSBuild.Community.Tasks.Targets"  />
+  <Import Project="C:\Program Files (x86)\MSBuild\ExtensionPack\4.0\MSBuild.ExtensionPack.tasks" />
+  <UsingTask AssemblyFile="IncrementVersionNumber.dll" TaskName="UpdateAssembly"/>
+  <UsingTask TaskName="Travelport.Tasks.IncrementingNumber" AssemblyFile="IncBuild.dll" />
+  <UsingTask TaskName="Travelport.Tasks.ParseVersion" AssemblyFile="ParseVersion.dll"/>
+
+
+  <PropertyGroup>
+    <ALLTargets>BeforeCompile;BuildNumberOverrideTarget;AfterGet;Succcess;</ALLTargets>
+    <BuildDefinitionName>3.0.0</BuildDefinitionName>
+    <BranchName>3.0.0</BranchName>
+    <VersionName>$(BranchName)</VersionName>
+    <ToolPath>"C:\Program Files (x86)\MSBuild\12.0\Bin\MSBuild.exe"</ToolPath>
+    <TF>"D:\Program Files\Microsoft Visual Studio 11.0\Common7\IDE\TF.exe"</TF>
+  </PropertyGroup>
+
+
+
+
+
+  <ItemGroup>
+    <SolutionToBuild Include="$(SolutionRoot)\test\test.sln"></SolutionToBuild>
+    <SolutionToBuild Include="$(SolutionRoot)\Rahul_Test\Rahul_sol2.sln"></SolutionToBuild>
+  </ItemGroup>
+
+
+  <Target Name="BeforeEndToEndIteration">
+    <Message Text="overiding the target"></Message>
+  </Target>
+
+  <Target Name="BuildNumberOverrideTarget">
+
+    <PropertyGroup>
+      <VersionString>$(VersionName).0</VersionString>
+    </PropertyGroup>
+
+    <ParseVersion VersionString="$(VersionString)">
+      <Output ItemName="Major" TaskParameter="Major" />
+      <Output ItemName="Minor" TaskParameter="Minor" />
+      <Output ItemName="Build" TaskParameter="Build" />
+    </ParseVersion>
+
+    <PropertyGroup>
+      <VersionMajor>@(Major)</VersionMajor>
+      <VersionMinor>@(Minor)</VersionMinor>
+      <VersionService>@(Build)</VersionService>
+    </PropertyGroup>
+
+    <!-- Create a custom build number, matching the assembly version -->
+    <Message Text="Loading last build number from file &quot;buildnumber.txt&quot;" />
+    <IncrementingNumber NumberFile="buildnumber.txt">
+      <Output TaskParameter="NextNumber" PropertyName="VersionBuild" />
+    </IncrementingNumber>
+    <PropertyGroup>
+      <!-- <BuildNumber>$(BuildDefinitionName)_$(VersionName).$(VersionBuild)</BuildNumber> -->
+      <BuildNumber>$(BuildDefinitionName).$(VersionBuild)</BuildNumber>
+    </PropertyGroup>
+
+  </Target>
+
+  <Target Name="AfterGet">
+    <Exec WorkingDirectory="$(SolutionRoot)\Builds" Command="$(TF) checkout buildnumber.txt " ContinueOnError="false"/>
+    <WriteLinesToFile File="$(SolutionRoot)\Builds\buildnumber.txt" Lines="$(VersionBuild)" Overwrite="true" />
+    <Exec WorkingDirectory="$(SolutionRoot)\Builds" Command="$(TF) checkin /override:&quot;Check-in from automated build&quot; /comment:&quot;Increment assembly version $(VersionBuild) &quot; buildnumber.txt"/>
+    <CreateItem Include="$(SolutionRoot)\test\test\**\AssemblyInfo.cs" Exclude="@(ExcludeAssemblyFiles)" >
+      <Output ItemName="AssemblyInfoFiles" TaskParameter="Include"/>
+    </CreateItem>
+    <CreateItem Include="$(SolutionRoot)\Rahul_Test\Rahul_sol2\**\AssemblyInfo.cs" Exclude="@(ExcludeAssemblyFiles)" >
+      <Output ItemName="Rahul_AssemblyInfoFiles" TaskParameter="Include"/>
+    </CreateItem>
+    <Attrib Files="@(AssemblyInfoFiles)" Normal="true" />
+    <FileUpdate Files="@(AssemblyInfoFiles)" Regex="AssemblyVersion\(&quot;.*&quot;\)\]" ReplacementText="AssemblyVersion(&quot;$(VersionMajor).$(VersionMinor).$(VersionService).$(VersionBuild)&quot;)]"></FileUpdate>
+    <FileUpdate Files="@(AssemblyInfoFiles)" Regex="AssemblyFileVersion\(&quot;.*&quot;\)\]" ReplacementText="AssemblyFileVersion(&quot;$(VersionMajor).$(VersionMinor).$(VersionService).$(VersionBuild)&quot;)]"></FileUpdate>
+    <Attrib Files="@(Rahul_AssemblyInfoFiles)" Normal="true" />
+    <FileUpdate Files="@(Rahul_AssemblyInfoFiles)" Regex="AssemblyVersion\(&quot;.*&quot;\)\]" ReplacementText="AssemblyVersion(&quot;$(VersionMajor).$(VersionMinor).$(VersionService).$(VersionBuild)&quot;)]"></FileUpdate>
+    <FileUpdate Files="@(Rahul_AssemblyInfoFiles)" Regex="AssemblyFileVersion\(&quot;.*&quot;\)\]" ReplacementText="AssemblyFileVersion(&quot;$(VersionMajor).$(VersionMinor).$(VersionService).$(VersionBuild)&quot;)]"></FileUpdate>
+    <Message Text="Assembly updates"></Message>
+
+  </Target>
+
+  <!--
+  <Target Name="AfterBuildFailed">
+    <PropertyGroup Condition=" '$(BuildBreak)'=='true' ">
+      <BuildResult>Failed</BuildResult>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(BuildBreak)'!='true' ">
+      <BuildResult>Succeeded</BuildResult>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(BuildBreak)'=='true' ">
+      <ActivityMessageSuffix>Failed</ActivityMessageSuffix>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(BuildBreak)'!='true' ">
+      <ActivityMessageSuffix>Successful</ActivityMessageSuffix>
+    </PropertyGroup>
+    
+    <PropertyGroup>
+      <Subject>SCM Activity Report: GTSM: Build $(BuildNumber): $(ActivityMessageSuffix)</Subject>
+    </PropertyGroup>
+    <ReadLinesFromFile File="$(SolutionRoot)\Builds\BuildGood.txt" Condition="Exists('$(SolutionRoot)\Builds\BuildGood.txt')" >
+      <Output TaskParameter="Lines" ItemName="MailTo"/>
+    </ReadLinesFromFile>
+    <Mail SmtpServer="$(SmtpServerAddress)" From="$(MailFrom)"  To="%(MailTo.Identity)" Subject="$(Subject)" IsBodyHtml="true" body="$(MailBody)"></Mail>
+    <Message Text="Hello Mail"></Message>
+
+  </Target>
+-->
+
+  <Target Name="AfterCompile">
+    <MSBuild Projects="@(SolutionToBuild)" Properties="Configuration=Release;Platform=Any CPU;OutDir=$(OutDir)"></MSBuild>
+    <Message Text="Hello Upgrade Test template$(SolutionRoot),$(OutDir)"></Message>
+  </Target>
+<!--
+  <Target Name="AfterOnBuildBreak">
+    <PropertyGroup Condition=" '$(BuildBreak)'=='true' ">
+      <ActivityMessageSuffix>Failed</ActivityMessageSuffix>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(BuildBreak)'!='true' ">
+      <ActivityMessageSuffix>Successful</ActivityMessageSuffix>
+    </PropertyGroup>
+
+    <PropertyGroup>
+      <MailFrom>Rahul.kumar2@travelport.com</MailFrom>
+      <MailTo>Rahul.kumar2@travelport.com</MailTo>
+      <MailServerAddress>mail1.wspan.com</MailServerAddress>
+      <ActivityMessage>Build $(BuildNumber) $(ActivityMessageSuffix)</ActivityMessage>
+      <MailSubject>$(TeamProject) Activity Report: $(ActivityMessage)</MailSubject>
+    </PropertyGroup>
+
+    <Mail SmtpServer="$(MailServerAddress)" To="$(MailTo)" From="$(MailFrom)" Subject="$(MailSubject)" IsBodyHtml="true" Body="$(MailBody)" />
+
+    <Message Text="AfterdropBuild"></Message>
+  </Target>
+
+  <Target Name="AfterEndToEndIteration">
+    <PropertyGroup Condition=" '$(BuildBreak)'=='true' ">
+      <ActivityMessageSuffix>Failed</ActivityMessageSuffix>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(BuildBreak)'!='true' ">
+      <ActivityMessageSuffix>Successful</ActivityMessageSuffix>
+    </PropertyGroup>
+
+    <PropertyGroup>
+      <MailFrom>Rahul.kumar2@travelport.com</MailFrom>
+      <MailTo>Rahul.kumar2@travelport.com</MailTo>
+      <MailServerAddress>mail1.wspan.com</MailServerAddress>
+      <ActivityMessage>Build $(BuildNumber) $(ActivityMessageSuffix)</ActivityMessage>
+      <MailSubject>$(TeamProject) Activity Report: $(ActivityMessage)</MailSubject>
+    </PropertyGroup>
+    <Mail  SmtpServer="$(MailServerAddress)" To="$(MailTo)" From="$(MailFrom)" Subject="$(MailSubject)" IsBodyHtml="true" Body="$(MailBody)" />
+</Target>
+
+  <Target Name="AfterDropBuild">
+    <Exec Command="md \\BLDSHPDVNS0010V.tvlport.net\tissc_xml_output\Test_Demo\BuildLogs_New\$(BuildNumber)"></Exec>
+  </Target>
+-->
+  <Target Name="DesktopBuild"
+         Condition=" '$(IsDesktopBuild)'=='true' "
+         DependsOnTargets="$(DesktopBuildDependsOn)">
+    <Message Condition=" '$(IsDesktopBuild)'=='true'" Text="DesktopBuild executed"></Message>
+  </Target>
+</Project>
